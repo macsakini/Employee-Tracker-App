@@ -1,4 +1,4 @@
-# blue
+# Blue Locator
 
 A new Flutter project.
 
