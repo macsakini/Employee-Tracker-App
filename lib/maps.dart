@@ -1,185 +1,117 @@
-import 'dart:async';
-
+import 'package:css_colors/css_colors.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
+import 'dart:math' show cos, sqrt, asin;
 
-import 'package:flutter_webview_plugin/flutter_webview_plugin.dart';
-
-const kAndroidUserAgent =
-    'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Mobile Safari/537.36';
-
-String selectedUrl = 'https://www.google.com/maps/@-1.2860886,36.9003507,15z';
-
-// ignore: prefer_collection_literals
-final Set<JavascriptChannel> jsChannels = [
-  JavascriptChannel(
-      name: 'Print',
-      onMessageReceived: (JavascriptMessage message) {
-        print(message.message);
-      }),
-].toSet();
-
-class MyApp2 extends StatelessWidget {
-  final flutterWebViewPlugin = FlutterWebviewPlugin();
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter WebView Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      routes: {
-        '/': (_) => const MyHomePage(title: 'Flutter WebView Demo'),
-        '/widget': (_) {
-          return SafeArea(
-              child: WebviewScaffold(
-                  url: selectedUrl,
-                  javascriptChannels: jsChannels,
-                  mediaPlaybackRequiresUserGesture: false,
-                  appBar: AppBar(
-                    title: const Text('Widget WebView'),
-                  ),
-                  withZoom: true,
-                  withLocalStorage: true,
-                  hidden: true,
-                  initialChild: Container(
-                    color: Colors.redAccent,
-                    child: const Center(
-                      child: Text('Waiting.....'),
-                    ),
-                  )));
-        },
-      },
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key key, this.title}) : super(key: key);
-
+class MapPage extends StatefulWidget {
   final String title;
+  final String taskName;
+  final String latitude;
+  final String longitude;
+  final String taskCode;
+
+  const MapPage(
+      {Key key,
+      this.title,
+      this.taskName,
+      this.taskCode,
+      this.latitude,
+      this.longitude})
+      : super(key: key);
 
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  MapPageState createState() =>
+      MapPageState(this.taskName, this.taskCode, this.latitude, this.longitude);
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  // Instance of WebView plugin
-  final flutterWebViewPlugin = FlutterWebviewPlugin();
+class MapPageState extends State<MapPage> {
+  final String taskName;
+  final String latitude;
+  final String longitude;
+  final String taskCode;
 
-  // On destroy stream
-  StreamSubscription _onDestroy;
+  MapPageState(this.taskName, this.taskCode, this.latitude, this.longitude);
 
-  // On urlChanged stream
-  StreamSubscription<String> _onUrlChanged;
-
-  // On urlChanged stream
-  StreamSubscription<WebViewStateChanged> _onStateChanged;
-
-  StreamSubscription<WebViewHttpError> _onHttpError;
-
-  StreamSubscription<double> _onProgressChanged;
-
-  StreamSubscription<double> _onScrollYChanged;
-
-  StreamSubscription<double> _onScrollXChanged;
-
-  final _urlCtrl = TextEditingController(text: selectedUrl);
-
-  final _codeCtrl = TextEditingController(text: 'window.navigator.userAgent');
-
-  final _scaffoldKey = GlobalKey<ScaffoldState>();
-
-  final _history = [];
-
-  @override
   void initState() {
     super.initState();
-
-    flutterWebViewPlugin.close();
-
-    _urlCtrl.addListener(() {
-      selectedUrl = _urlCtrl.text;
-    });
-
-    // Add a listener to on destroy WebView, so you can make came actions.
-    _onDestroy = flutterWebViewPlugin.onDestroy.listen((_) {
-      if (mounted) {
-        // Actions like show a info toast.
-        _scaffoldKey.currentState.showSnackBar(
-            const SnackBar(content: const Text('Webview Destroyed')));
-      }
-    });
-
-    // Add a listener to on url changed
-    _onUrlChanged = flutterWebViewPlugin.onUrlChanged.listen((String url) {
-      if (mounted) {
-        setState(() {
-          _history.add('onUrlChanged: $url');
-        });
-      }
-    });
-
-    _onProgressChanged =
-        flutterWebViewPlugin.onProgressChanged.listen((double progress) {
-      if (mounted) {
-        setState(() {
-          _history.add('onProgressChanged: $progress');
-        });
-      }
-    });
-
-    _onScrollYChanged =
-        flutterWebViewPlugin.onScrollYChanged.listen((double y) {
-      if (mounted) {
-        setState(() {
-          _history.add('Scroll in Y Direction: $y');
-        });
-      }
-    });
-
-    _onScrollXChanged =
-        flutterWebViewPlugin.onScrollXChanged.listen((double x) {
-      if (mounted) {
-        setState(() {
-          _history.add('Scroll in X Direction: $x');
-        });
-      }
-    });
-
-    _onStateChanged =
-        flutterWebViewPlugin.onStateChanged.listen((WebViewStateChanged state) {
-      if (mounted) {
-        setState(() {
-          _history.add('onStateChanged: ${state.type} ${state.url}');
-        });
-      }
-    });
-
-    _onHttpError =
-        flutterWebViewPlugin.onHttpError.listen((WebViewHttpError error) {
-      if (mounted) {
-        setState(() {
-          _history.add('onHttpError: ${error.code} ${error.url}');
-        });
-      }
-    });
   }
+
+  //mapController.dispose();
+  final GlobalKey<ScaffoldState> _scaffoldKey = new GlobalKey<ScaffoldState>();
+
+  MapController mapController = MapController(
+      initMapWithUserPosition: true,
+      initPosition: GeoPoint(latitude: -1.2921, longitude: 36.8219));
 
   @override
   void dispose() {
-    // Every listener should be canceled, the same should be done with this stream.
-    _onDestroy.cancel();
-    _onUrlChanged.cancel();
-    _onStateChanged.cancel();
-    _onHttpError.cancel();
-    _onProgressChanged.cancel();
-    _onScrollXChanged.cancel();
-    _onScrollYChanged.cancel();
-
-    flutterWebViewPlugin.dispose();
-
+    mapController.dispose();
     super.dispose();
+  }
+
+  Future<String> start() async {
+    GeoPoint col = await mapController.myLocation();
+    GeoPoint newcoord = GeoPoint(
+        latitude: double.parse(latitude), longitude: double.parse(longitude));
+
+    mapController.changeLocation(newcoord);
+
+    RoadInfo roadInfo = await mapController.drawRoad(col, newcoord);
+    print("${roadInfo.distance}km");
+    print("${roadInfo.duration}sec");
+
+    return "${roadInfo.distance}km";
+  }
+
+  bool hasStarted = false;
+
+  var distance = 0.0;
+
+  Future<double> calculateDistance(lat2, lon2) async {
+    GeoPoint loc = await mapController.myLocation();
+    var p = 0.017453292519943295;
+    var c = cos;
+    var a = 0.5 -
+        c((lat2 - loc.latitude) * p) / 2 +
+        c(loc.latitude * p) *
+            c(lat2 * p) *
+            (1 - c((lon2 - loc.longitude) * p)) /
+            2;
+    double val = 12742 * asin(sqrt(a));
+
+    if (val < 2) {
+      print("Access Allowed");
+
+      start();
+
+      _scaffoldKey.currentState.showSnackBar(SnackBar(
+        content: new Text('Task Started successfully.'),
+        duration: new Duration(seconds: 10),
+      ));
+
+
+      //This is under testing.....setState makes the app crash
+      setState(() {
+        hasStarted = true;
+        distance = val;
+      });
+    } else {
+      print("Access Denied");
+
+      _scaffoldKey.currentState.showSnackBar(SnackBar(
+        content: new Text('Error: Cannot start Task: Location Mismatch.'),
+        duration: new Duration(seconds: 10),
+      ));
+
+      start();
+    }
+
+    print(val);
+
+    return val;
   }
 
   @override
@@ -187,97 +119,94 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
-        title: const Text('Plugin example app'),
+        title: Text('Mac Maps'),
+        centerTitle: true,
+        backgroundColor: Colors.black,
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24.0),
-              child: TextField(controller: _urlCtrl),
+      body: Column(
+        mainAxisSize: MainAxisSize.max,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+              flex: 8,
+              child: OSMFlutter(
+                controller: mapController,
+                trackMyPosition: true,
+                initZoom: 16,
+                stepZoom: 1.0,
+                userLocationMarker: UserLocationMaker(
+                  personMarker: MarkerIcon(
+                    icon: Icon(
+                      Icons.location_history_rounded,
+                      color: Colors.red,
+                      size: 48,
+                    ),
+                  ),
+                  directionArrowMarker: MarkerIcon(
+                    icon: Icon(
+                      Icons.double_arrow,
+                      size: 48,
+                    ),
+                  ),
+                ),
+                road: Road(
+                  startIcon: MarkerIcon(
+                    icon: Icon(
+                      Icons.person,
+                      size: 64,
+                      color: Colors.brown,
+                    ),
+                  ),
+                  roadColor: CSSColors.red,
+                ),
+                markerOption: MarkerOption(
+                    defaultMarker: MarkerIcon(
+                  icon: Icon(
+                    Icons.person_pin_circle,
+                    color: Colors.blue,
+                    size: 56,
+                  ),
+                )),
+              )),
+          Expanded(
+            flex: 2,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                // crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      taskName,
+                      style:
+                          TextStyle(fontSize: 25, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text("$distance Km", style: TextStyle(fontSize: 20)),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: FlatButton(
+                      color: CSSColors.black,
+                      child: Text(
+                        'Check In',
+                        style:
+                            TextStyle(fontSize: 20.0, color: CSSColors.white),
+                      ),
+                      onPressed: () {
+                        calculateDistance(
+                            double.parse(latitude), double.parse(longitude));
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
-            RaisedButton(
-              onPressed: () {
-                flutterWebViewPlugin.launch(
-                  selectedUrl,
-                  rect: Rect.fromLTWH(
-                      0.0, 0.0, MediaQuery.of(context).size.width, 300.0),
-                  userAgent: kAndroidUserAgent,
-                  invalidUrlRegex:
-                      r'^(https).+(twitter)', // prevent redirecting to twitter when user click on its icon in flutter website
-                );
-              },
-              child: const Text('Open Webview (rect)'),
-            ),
-            RaisedButton(
-              onPressed: () {
-                flutterWebViewPlugin.launch(selectedUrl, hidden: true);
-              },
-              child: const Text('Open "hidden" Webview'),
-            ),
-            RaisedButton(
-              onPressed: () {
-                flutterWebViewPlugin.launch(selectedUrl);
-              },
-              child: const Text('Open Fullscreen Webview'),
-            ),
-            RaisedButton(
-              onPressed: () {
-                Navigator.of(context).pushNamed('/widget');
-              },
-              child: const Text('Open widget webview'),
-            ),
-            Container(
-              padding: const EdgeInsets.all(24.0),
-              child: TextField(controller: _codeCtrl),
-            ),
-            RaisedButton(
-              onPressed: () {
-                final future =
-                    flutterWebViewPlugin.evalJavascript(_codeCtrl.text);
-                future.then((String result) {
-                  setState(() {
-                    _history.add('eval: $result');
-                  });
-                });
-              },
-              child: const Text('Eval some javascript'),
-            ),
-            RaisedButton(
-              onPressed: () {
-                final future = flutterWebViewPlugin
-                    .evalJavascript('alert("Hello World");');
-                future.then((String result) {
-                  setState(() {
-                    _history.add('eval: $result');
-                  });
-                });
-              },
-              child: const Text('Eval javascript alert()'),
-            ),
-            RaisedButton(
-              onPressed: () {
-                setState(() {
-                  _history.clear();
-                });
-                flutterWebViewPlugin.close();
-              },
-              child: const Text('Close'),
-            ),
-            RaisedButton(
-              onPressed: () {
-                flutterWebViewPlugin.getCookies().then((m) {
-                  setState(() {
-                    _history.add('cookies: $m');
-                  });
-                });
-              },
-              child: const Text('Cookies'),
-            ),
-            Text(_history.join('\n'))
-          ],
-        ),
+          )
+        ],
       ),
     );
   }
